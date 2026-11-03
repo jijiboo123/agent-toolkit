@@ -1,0 +1,10 @@
+# 本地配置（含真实 key，绝不提交）
+api_config.json
+# 运行期数据
+api_cache.json
+车次库.json
+我的行程.json
+# Python
+__pycache__/
+*.pyc
+.venv/

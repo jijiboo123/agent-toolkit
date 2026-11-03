@@ -1,0 +1,29 @@
+{
+    "enabled":  true,
+    "provider":  "聚合数据 · 火车订票班次查询",
+    "method":  "GET",
+    "url":  "https://apis.juhe.cn/fapigw/train/query",
+    "key":  "",
+    "key_field":  "key",
+    "params":  {
+                   "search_type":  "1",
+                   "departure_station":  "{from}",
+                   "arrival_station":  "{to}",
+                   "date":  "{date}"
+               },
+    "headers":  {
+
+                },
+    "records_path":  "result",
+    "price_seat":  "二等座",
+    "field_map":  {
+                      "code":  "train_no",
+                      "from_station":  "departure_station",
+                      "to_station":  "arrival_station",
+                      "depart":  "departure_time",
+                      "arrive":  "arrival_time",
+                      "duration":  "duration",
+                      "price":  "prices.0.price"
+                  },
+    "_备注":  "复制本文件为 api_config.json，填入你自己的 key（聚合数据 juhe.cn，火车票接口，文档 https://www.juhe.cn/docs/api/id/817）"
+}
