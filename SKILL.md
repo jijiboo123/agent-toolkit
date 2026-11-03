@@ -5,13 +5,16 @@ description: Make AI code editing visible and verifiable. Use when the user want
 
 # Agent Toolkit
 
-让 AI 改代码的过程**对人可见、对结果可验证**。三件工具解决三个真实痛点：
+让 AI 改代码的过程**对人可见、对结果可验证**。六个小工具各解决一个真实痛点：
 
 | 工具 | 解决的痛点 |
 |---|---|
 | `scripts/type_write.py` | 代码"啪"地一次写进去，人根本看不清改了什么 |
 | `scripts/jump.py` | 改完才说"我改了第 120 行"，人得自己去找 |
 | `scripts/jsdom_harness.cjs` | 没有浏览器就没法验证前端，只能靠肉眼 |
+| `scripts/route_diff.py` | 说不清"这次到底改了多少"，全凭感觉 |
+| `scripts/curl_probe.py` | 接口通不通只能靠猜，不知道状态码和耗时 |
+| `scripts/acl_fix.ps1` | Windows 权限异常导致沙箱起不来，只能干瞪眼 |
 
 ## 什么时候用
 
@@ -78,12 +81,69 @@ module.exports = async ({ doc, window, sleep }) => {
 
 ## 推荐流程
 
+## 工具四：route_diff.py 改动量对比
+
+```bash
+python scripts/route_diff.py old.py new.py
+python scripts/route_diff.py old.py new.py --unified     # 附完整 diff
+python scripts/route_diff.py --git HEAD app.py           # 对比 git 版本与工作区
+```
+
+输出：
+
+```
+行数      : 24 → 29
+新增/删除 : +5 / -0
+保留      : 24 行
+改动率    : 20.8%
+新增函数  : greet_clean
+```
+
+**用处在说完"改好了"之后**：给用户一个数字，而不是一句"我优化了代码"。
+退出码 `0` 无改动、`1` 有改动，能直接接 CI。
+
+## 工具五：curl_probe.py 接口探测
+
+```bash
+python scripts/curl_probe.py https://api.example.com/health
+python scripts/curl_probe.py https://api.example.com/list -H "Authorization: Bearer xxx" --json
+python scripts/curl_probe.py https://cdn.example.com/movie.mp4 --range 0-1023
+python scripts/curl_probe.py https://self-signed.local/api --insecure
+```
+
+输出状态码、耗时、类型、长度、分片支持、正文预览。退出码 `0` = 2xx。
+
+**两个真实坑**（都已在脚本里处理）：
+
+| 现象 | 原因 | 脚本行为 |
+|---|---|---|
+| `CERTIFICATE_VERIFY_FAILED` | 精简版 Python 缺 CA 证书 | 提示加 `--insecure` |
+| 视频不能拖动进度条 | 服务端没回 `Accept-Ranges` | `--range` 一测就知道 |
+
+## 工具六：acl_fix.ps1 Windows 权限诊断
+
+```powershell
+.\scripts\acl_fix.ps1 -Path "D:\work\proj"          # 只诊断
+.\scripts\acl_fix.ps1 -Path "D:\work\proj" -Fix     # 真去改
+```
+
+症状：某目录里跑东西报 `SetNamedSecurityInfoW failed (Win32 5)`，或沙箱建不起来。
+根因通常是目录缺 `WRITE_OWNER`。
+
+脚本会打印**原始 SDDL**（回滚用）、列出当前用户的显式权限，`-Fix` 才动手，动手后复核。
+
+> 注意两条：脚本内有 `exit`，**用子进程跑**（`powershell -File ...`），别在交互式 shell 里 dot-source；
+> `.ps1` 必须存成 **UTF-8 带 BOM**，否则 PowerShell 5.1 会把中文注释读成乱码并报语法错。
+
+## 推荐流程
+
 1. **`jump.py` 跳到要改的行**（人看得见落点）
 2. 改（小改动用 `type_write`，大改动分段写）
 3. **`jump.py` 再跳到改完的行**
 4. `node --check` / `python -m py_compile`
 5. `jsdom_harness` 或真实运行验证
-6. 把验证结果贴给用户
+6. **`route_diff.py` 给出改动量数字**（改了几行、动了哪些函数）
+7. 把验证结果贴给用户
 
 ## 常见坑
 

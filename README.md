@@ -63,6 +63,57 @@ module.exports = async ({ doc, window, sleep }) => {
 
 退出码 `0` 通过、`2` 断言失败、`3` 加载失败，可以直接接 CI。
 
+## 工具四：`scripts/route_diff.py` —— 用数字说"我改了多少"
+
+```bash
+python scripts/route_diff.py old.py new.py
+python scripts/route_diff.py --git HEAD app.js --unified
+```
+
+```
+行数      : 24 → 29
+新增/删除 : +5 / -0
+保留      : 24 行
+改动率    : 20.8%
+新增函数  : greet_clean
+```
+
+改完代码说"我优化了一下"，跟贴出上面这张表，可信度完全不同。退出码 `0` 无改动、`1` 有改动。
+
+## 工具五：`scripts/curl_probe.py` —— 接口探测
+
+```bash
+python scripts/curl_probe.py https://api.example.com/health
+python scripts/curl_probe.py https://api.example.com/list -H "Authorization: Bearer xxx" --json
+python scripts/curl_probe.py https://cdn.example.com/movie.mp4 --range 0-1023
+```
+
+```
+状态    : 206 Partial Content
+耗时    : 673 ms
+类型    : text/html; charset=utf-8
+长度    : 100
+收到    : 100 字节
+```
+
+`--range` 用来验证服务端是否支持分片（视频能不能拖进度条就靠这个）。
+
+**实测踩的两个坑**，脚本里都处理了：
+
+- 精简版 Python 常常 `CERTIFICATE_VERIFY_FAILED`（缺 CA 证书）→ 提示加 `--insecure`
+- 有些服务端不返回 `Accept-Ranges`，前端进度条就会失效 → 一测便知
+
+## 工具六：`scripts/acl_fix.ps1` —— Windows 权限诊断
+
+```powershell
+.\scripts\acl_fix.ps1 -Path "D:\work\proj"          # 只诊断，不动权限
+.\scripts\acl_fix.ps1 -Path "D:\work\proj" -Fix     # 真去修
+```
+
+针对 Windows 上 `SetNamedSecurityInfoW failed (Win32 5)` 这类"目录权限不足导致沙箱起不来"的问题。会打印原始 SDDL（回滚用）、当前用户的显式权限，`-Fix` 之后还会复核。
+
+> 两个注意点：脚本内有 `exit`，用 `powershell -File` 子进程跑；`.ps1` 要存成 **UTF-8 带 BOM**，否则 PowerShell 5.1 把中文注释读成乱码直接报语法错（这个坑我踩了）。
+
 ## 安装
 
 **方式一：当技能用**（支持 Skill 的 agent）
