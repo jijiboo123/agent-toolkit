@@ -15,6 +15,7 @@ description: Make AI code editing visible and verifiable. Use when the user want
 | `scripts/route_diff.py` | 说不清"这次到底改了多少"，全凭感觉 |
 | `scripts/curl_probe.py` | 接口通不通只能靠猜，不知道状态码和耗时 |
 | `scripts/acl_fix.ps1` | Windows 权限异常导致沙箱起不来，只能干瞪眼 |
+| `scripts/repo_map.py` | 项目一大，模型就得一个个文件读，烧上下文 |
 
 ## 什么时候用
 
@@ -135,15 +136,50 @@ python scripts/curl_probe.py https://self-signed.local/api --insecure
 > 注意两条：脚本内有 `exit`，**用子进程跑**（`powershell -File ...`），别在交互式 shell 里 dot-source；
 > `.ps1` 必须存成 **UTF-8 带 BOM**，否则 PowerShell 5.1 会把中文注释读成乱码并报语法错。
 
+## 工具七：repo_map.py 项目结构图
+
+```bash
+python scripts/repo_map.py                                    # 当前目录
+python scripts/repo_map.py --dir ../查询路线 --tokens 2000
+python scripts/repo_map.py --focus query_route.py --json
+```
+
+把整个项目压成一张带行号的符号树，丢给模型看。思路借鉴 [aider](https://github.com/Aider-AI/aider) 的 `repomap.py`，
+但去掉了 tree-sitter / networkx / diskcache 三个重依赖——**只用标准库**。
+
+原理三步：
+
+1. **提符号**：Python 用 `ast` 拿模块级函数和类方法（带签名和行号）；JS/TS 用行级正则匹配 `function`/`class`/`const = () =>`
+2. **建文件图**：文件 A 用到文件 B 定义的符号，就连一条 A→B 的边
+3. **PageRank + 预算截断**：被引用得多的文件排前面；入口文件（有 `__main__` 守卫且定义了 `main()`）强制排第一
+
+实测（查询路线，1277 行 Python）：
+
+```
+# 项目结构：查询路线（4 个源文件）
+query_route.py  (720 行)
+  App  :225
+    App.do_search(self)  :405
+    App.find_transfers(self)  :447
+    ...
+# 约 697 tokens（预算 2000）
+```
+
+**1277 行 → 697 tokens**，压缩比约 1:12。改代码前先跑一遍，就不用把文件一个个读进上下文。
+
+> 为什么入口文件不靠 PageRank：入口没有入度（没人 import 它），PageRank 天然把它排最后。
+> 我自己试过加权，得加到 20 倍才压得过工具模块，不如直接排序。
+
 ## 推荐流程
 
-1. **`jump.py` 跳到要改的行**（人看得见落点）
-2. 改（小改动用 `type_write`，大改动分段写）
-3. **`jump.py` 再跳到改完的行**
-4. `node --check` / `python -m py_compile`
-5. `jsdom_harness` 或真实运行验证
-6. **`route_diff.py` 给出改动量数字**（改了几行、动了哪些函数）
-7. 把验证结果贴给用户
+1. **`repo_map.py` 先看全局**（项目大时尤其必要）
+2. **`jump.py` 跳到要改的行**（人看得见落点）
+3. 改（小改动用 `type_write`，大改动分段写）
+4. **`jump.py` 再跳到改完的行**
+5. `node --check` / `python -m py_compile`
+6. `jsdom_harness` 或真实运行验证
+7. **`route_diff.py` 给出改动量数字**（改了几行、动了哪些函数）
+8. 把验证结果贴给用户
 
 ## 常见坑
 
